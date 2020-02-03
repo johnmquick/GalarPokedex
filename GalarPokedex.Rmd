@@ -1,0 +1,822 @@
+---
+title: "Data Extraction of Galar Pokédex from Serebii.net"
+author: "John M. Quick"
+website: http://johnmquick.com
+date: "2/3/2020"
+output: html_document
+copyright: Copyright John M. Quick. All Rights Reserved.
+keywords: Data Extraction, Web Scrape, Web Harvest, R, Nintendo Switch, Pokemon, Pokémon, Sword, Shield, Galar, Pokédex, Pokedex, Serebii
+---
+
+## Abstract
+
+Raw data for over 400 Pokémon were extracted from the Galar Pokédex presented on the website serebii.net on January 31, 2020. The raw data were cleaned and organized into a tidy dataset. The cleaned dataset contains 429 rows representing the 400 Pokémon in the Galar Pokedex (including variants) and 110 columns representing the characteristics of each Pokémon. This document describes the analysis conducted to produce the cleaned dataset.
+
+*Keywords: Data Extraction, Web Scrape, Web Harvest, R, Nintendo Switch, Pokemon, Pokémon, Sword, Shield, Galar, Pokédex, Pokedex, Serebii*
+
+## Setup
+
+Load the required R packages for this analysis. If they are not already installed on your system, be sure to install them first.
+
+```{r Setup, message = FALSE, warning = FALSE, results = FALSE, }
+
+# load required packages
+# if necessary, install them first
+library(rvest)
+library(stringr)
+library(data.table)
+
+```
+
+## Data Collection
+
+A custom function named `fDataCollect` is defined. This function retrieves the webpage for each Pokémon from the source website and stores the html files in a specified directory. 
+
+```{r Data Collection}
+
+# custom function: collect the data from the website and place raw html files in a directory
+fDataCollect <- function(dir) {
+        
+        # home URL for serebii.net
+        urlHome <- "https://www.serebii.net"
+        
+        # base URL for Galar Pokedex (Pokemon Sword/Shield)
+        urlGalar <- "https://www.serebii.net/pokedex-swsh"
+        
+        # read the base URL
+        htmlGalar <- read_html(urlGalar)
+        
+        # get the relative URLs for all Pokemon pages
+        # get the page content node (id = "content")
+        # get the form containing the page names for all Galar Pokemon (name = "galar")
+        # get the value (relative URL) of all of the selectable options
+        urlGalarPages <- 
+                html_nodes(htmlGalar, xpath = ".//*[@id='content']") %>%
+                html_nodes(xpath = ".//*[@name = 'galar']/select/option") %>% 
+                html_attr("value")
+        
+        # remove the first item, since it does not lead to a relevant page
+        urlGalarPages <- urlGalarPages[-1]
+        
+        # create a subdirectory to store all of the html pages
+        # check whether directory exists
+        if (!dir.exists(dir)) {
+                
+                # create directory
+                dir.create(dir)
+        }
+        
+        # iterate through pages
+        for (i in 1:length(urlGalarPages)) {
+                
+                # create a file path in subdirectory with a unique id and leading zeros
+                pFilePath <- 
+                        str_glue(
+                                dir, 
+                                "/", 
+                                str_pad(
+                                        "p", 
+                                        width = 5 - str_count(i), 
+                                        side = "right", 
+                                        pad = "0"
+                                ), 
+                                i, 
+                                ".html"
+                        )
+                
+                # if the file doesn't already exist
+                if (!file.exists(pFilePath)) {
+                        
+                        # form page url
+                        pUrl <- str_glue(urlHome, urlGalarPages[i])
+                        
+                        # read the page html
+                        # extract the data from the content node
+                        pPageContent <- read_html(pUrl) %>% html_nodes(xpath = "//*[@id='content']")
+                        
+                        # write page content to html file
+                        write_html(pPageContent, pFilePath)
+                }
+        }
+}
+
+```
+
+## Data Preparation
+
+An empty data table names `data` is created to store the complete, cleaned dataset. All columns are provided with names and data types. 
+
+```{r Data Preparation}
+
+# create a table to store all of the data
+# create a typed column for each variable
+# table is empty, not filled with any data
+data <- data.table(
+        NumGal = numeric(), 
+        NumNat = numeric(), 
+        Name = character(), 
+        CanDynamax = logical(), 
+        CaptureRate = numeric(), 
+        BaseEggSteps = numeric(), 
+        PctM = numeric(), 
+        PctF = numeric(), 
+        Height = numeric(), 
+        Weight = numeric(), 
+        Variant = character(), 
+        Type1 = character(),
+        Type2 = character(), 
+        WkNorm = numeric(), 
+        WkFire = numeric(), 
+        WkWater = numeric(), 
+        WkElec = numeric(), 
+        WkGrass = numeric(), 
+        WkIce = numeric(), 
+        WkFight = numeric(), 
+        WkPoison = numeric(), 
+        WkGround = numeric(), 
+        WkFly = numeric(), 
+        WkPsy = numeric(), 
+        WkBug = numeric(), 
+        WkRock = numeric(), 
+        WkGhost = numeric(), 
+        WkDrag = numeric(), 
+        WkDark = numeric(), 
+        WkSteel = numeric(), 
+        WkFairy = numeric(), 
+        BaseTotal = numeric(), 
+        BaseHp = numeric(), 
+        BaseAtk = numeric(), 
+        BaseDef = numeric(), 
+        BaseSpAtk = numeric(), 
+        BaseSpDef = numeric(), 
+        BaseSpd = numeric(), 
+        HinHpMin50 = numeric(), 
+        HinHpMax50 = numeric(), 
+        HinAtkMin50 = numeric(), 
+        HinAtkMax50 = numeric(), 
+        HinDefMin50 = numeric(), 
+        HinDefMax50 = numeric(), 
+        HinSpAtkMin50 = numeric(), 
+        HinSpAtkMax50 = numeric(), 
+        HinSpDefMin50 = numeric(), 
+        HinSpDefMax50 = numeric(), 
+        HinSpdMin50 = numeric(), 
+        HinSpdMax50 = numeric(), 
+        HinHpMin100 = numeric(), 
+        HinHpMax100 = numeric(), 
+        HinAtkMin100 = numeric(), 
+        HinAtkMax100 = numeric(), 
+        HinDefMin100 = numeric(), 
+        HinDefMax100 = numeric(), 
+        HinSpAtkMin100 = numeric(), 
+        HinSpAtkMax100 = numeric(), 
+        HinSpDefMin100 = numeric(), 
+        HinSpDefMax100 = numeric(), 
+        HinSpdMin100 = numeric(), 
+        HinSpdMax100 = numeric(), 
+        NeuHpMin50 = numeric(), 
+        NeuHpMax50 = numeric(), 
+        NeuAtkMin50 = numeric(), 
+        NeuAtkMax50 = numeric(), 
+        NeuDefMin50 = numeric(), 
+        NeuDefMax50 = numeric(), 
+        NeuSpAtkMin50 = numeric(), 
+        NeuSpAtkMax50 = numeric(), 
+        NeuSpDefMin50 = numeric(), 
+        NeuSpDefMax50 = numeric(), 
+        NeuSpdMin50 = numeric(), 
+        NeuSpdMax50 = numeric(), 
+        NeuHpMin100 = numeric(), 
+        NeuHpMax100 = numeric(), 
+        NeuAtkMin100 = numeric(), 
+        NeuAtkMax100 = numeric(), 
+        NeuDefMin100 = numeric(), 
+        NeuDefMax100 = numeric(), 
+        NeuSpAtkMin100 = numeric(), 
+        NeuSpAtkMax100 = numeric(), 
+        NeuSpDefMin100 = numeric(), 
+        NeuSpDefMax100 = numeric(), 
+        NeuSpdMin100 = numeric(), 
+        NeuSpdMax100 = numeric(), 
+        BenHpMin50 = numeric(), 
+        BenHpMax50 = numeric(), 
+        BenAtkMin50 = numeric(), 
+        BenAtkMax50 = numeric(), 
+        BenDefMin50 = numeric(), 
+        BenDefMax50 = numeric(), 
+        BenSpAtkMin50 = numeric(), 
+        BenSpAtkMax50 = numeric(), 
+        BenSpDefMin50 = numeric(), 
+        BenSpDefMax50 = numeric(), 
+        BenSpdMin50 = numeric(), 
+        BenSpdMax50 = numeric(), 
+        BenHpMin100 = numeric(), 
+        BenHpMax100 = numeric(), 
+        BenAtkMin100 = numeric(), 
+        BenAtkMax100 = numeric(), 
+        BenDefMin100 = numeric(), 
+        BenDefMax100 = numeric(), 
+        BenSpAtkMin100 = numeric(), 
+        BenSpAtkMax100 = numeric(), 
+        BenSpDefMin100 = numeric(), 
+        BenSpDefMax100 = numeric(), 
+        BenSpdMin100 = numeric(), 
+        BenSpdMax100 = numeric()
+)
+
+```
+
+## Data Cleaning
+
+A series of custom functions are defined. Each function contributes to the data extraction and cleaning process by handling both common and idiosyncratic elements of the source website's html structure. The functions include: 
+
+* `fScrape`: Iterates through all files in a given directory and compiles their data into a cleaned dataset
+* `fCheckVariants`: Given the page content for a Pokémon, checks whether variants exist and returns a corresponding logical value
+* `fGetData`: Given a file, directs data extraction for variants and non-variants accordingly, then returns one or more complete rows representing a Pokémon and its variants, if any
+* `fGetDataCommon`: Given the page content for a Pokémon, extracts, cleans, and returns all data that is the same, regardless of whether variants exist
+* `fGetDataNormal`: Given the page content for a Pokémon, extracts, cleans, and returns all data that applies to Pokémon that do not have variants
+* `fGetDataVariant`: Given the page content for a Pokémon, extracts, cleans, and returns all data that applies to Pokémon that have variants 
+* `fFixRotom`: Fixes an inconsistency that occurs in the source webpage for Rotom that would otherwise result in inaccuracies in the dataset 
+
+```{r Data Cleaning}
+
+# custom function: extract all relevant data from multiple files in a directory and build a clean dataset
+fScrape <- function(dir) {
+        
+        # retrieve all files from subdirectory
+        files <- list.files(dir)
+        
+        # iterate through all files
+        for (i in 1:length(files)) {
+                
+                # create a file path that includes the subdirectory
+                file <- str_glue(dir, "/", files[i])
+                
+                # get the data from the file
+                fileData <- fGetData(file)
+                
+                # add the data (one or more rows) to the primary dataset
+                data <- rbind(data, fileData, use.names = FALSE)
+        }
+        
+        # fix inconsistent data
+        fFixRotom(data)
+        
+        # return
+        return(data)
+}
+
+# custom function: check whether variants exist
+fCheckVariants <- function(nodes) {
+        
+        # most Pokemon do not have variants
+        # default to no variants
+        hasVariants <- FALSE
+        
+        # check whether variants exist
+        # look for an interior table within the common info table ("cen" class)
+        # multiple variant names and types, if any, are stored in rows (tr)
+        numVariants <- 
+                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'cen']/table/tr") %>% 
+                length()
+        
+        # no variants
+        if (numVariants > 0) {
+                
+                # toggle flag
+                hasVariants <- TRUE
+        }
+        
+        # return
+        return(hasVariants)
+}
+
+# custom function: extract all relevant data for Pokemon, regardless of variants
+fGetData <- function(file) {
+        
+        # retrieve all relevant page data from the "dextable" class
+        pRaw <- read_html(file) %>% html_nodes(xpath = ".//*[@class = 'dextable']")
+        # check for variants
+        # if variants
+        if (fCheckVariants(pRaw)) {
+                
+                # the variants function returns complete data for all variants
+                # each variant is a row in the dataset
+                pData <- fGetDataVariant(pRaw)
+        }
+        
+        # if no variants
+        else {
+                
+                # the normal function returns complete data for one non-variant
+                # this represents one row in the dataset
+                pData <- fGetDataNormal(pRaw)
+        }
+        
+        # return the data
+        return(pData)
+}
+
+# custom function: extract all relevant data that is in common, regardless of variants
+fGetDataCommon <- function(nodes) {
+        
+        # get the data from the common info table
+        pDataCommon <- 
+                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'fooinfo']") %>% 
+                html_text(trim = TRUE)
+        
+        # name
+        pName <- pDataCommon[1]
+        
+        # number
+        pNumNat <- as.numeric(str_extract_all(pDataCommon[3], "\\d+", simplify = TRUE)[1])
+        pNumGalar <- as.numeric(str_extract_all(pDataCommon[3], "\\d+", simplify = TRUE)[2])
+        
+        # check for genderless Pokemon
+        if (grepl("Genderless", pDataCommon[4])) {
+                
+                # set values to 0 to indicate no gender
+                pPctM <- 0
+                pPctF <- 0
+        }
+        
+        # otherwise, extract gender ratio
+        else {
+                
+                # percentage of males and females
+                pPctM <- as.numeric(str_extract_all(pDataCommon[4], "\\d+\\.?\\d*", simplify = TRUE))[1] / 100
+                pPctF <- as.numeric(str_extract_all(pDataCommon[4], "\\d+\\.?\\d*", simplify = TRUE))[2] / 100
+                
+        }
+        
+        # capture rate
+        pCaptureRate <- as.numeric(pDataCommon[8]) / 100
+        
+        # base egg steps
+        pBaseEggSteps <- as.numeric(str_replace(pDataCommon[9], "\\,", ""))
+        
+        # get the data from the experience growth table
+        pDataExp <- 
+                subset(nodes, subset = grepl("Experience Growth", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'fooinfo']") %>% 
+                html_text(trim = TRUE)
+        
+        # whether the Pokemon can Dynamax
+        pCanDynamax <- !str_detect(pDataExp[5], "cannot")
+        
+        # combine the data into a table
+        # represents a single row with partial columns in dataset
+        pRow <- data.table(
+                pNumGalar, 
+                pNumNat, 
+                pName, 
+                pCanDynamax, 
+                pCaptureRate, 
+                pBaseEggSteps, 
+                pPctM, 
+                pPctF 
+        )
+        
+        # return
+        return(pRow)
+}
+
+# custom function: extract all relevant data for normal (non-variant) Pokemon
+fGetDataNormal <- function(nodes) {
+        
+        # get the data from the common info table
+        pDataCommon <- 
+                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'fooinfo']") %>% 
+                html_text(trim = TRUE)
+        
+        # height (in meters) converted into a numeric value
+        # located in row 6
+        # look for 1 or more digits, then "m"
+        # a decimal point is optional, followed by 0 or more digits
+        # non-numeric text is removed
+        pHeight <- 
+                as.numeric(
+                        str_replace_all(
+                                unlist(
+                                        str_extract_all(
+                                                pDataCommon[6], 
+                                                "(\\d+\\.?\\d*)m"
+                                        )    
+                                ), 
+                                c("m" = "")
+                        )
+                )
+        
+        # weight (in kg) converted into a numeric value
+        # located in row 7
+        # look for 1 or more digits, then "kg"
+        # a decimal point is optional, followed by 0 or more digits
+        # non-numeric text is removed
+        pWeight <- 
+                as.numeric(
+                        str_replace_all(
+                                unlist(
+                                        str_extract_all(
+                                                pDataCommon[7], 
+                                                "(\\d+\\.?\\d*)kg"
+                                        )    
+                                ), 
+                                c("kg" = "")
+                        )
+                )
+        
+        # no variant (normal)
+        pVariant <- "Normal"
+        
+        # extract the type data
+        # look for an interior table within the common info table ("cen" class)
+        # type identifiers are found in the img alt tag(s)
+        # remove unnecessary text from the img alt tags (-type)
+        pDataTypes <- 
+                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'cen']/a/img") %>% 
+                html_attr("alt") %>% 
+                str_extract("(.*)(?=(-type))")
+        
+        # assign the first type
+        pType1 <- pDataTypes[1]
+        
+        # assign the second type, if any
+        pType2 <- if (length(pDataTypes) > 1) pDataTypes[2] else "None"
+        
+        # get the data from the weakness info table
+        # one weakness multiplier for each type
+        # same format for all Pokemon
+        pDataWeak <- 
+                subset(nodes, subset = grepl("Weakness", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'footype']") %>% 
+                html_text(trim = TRUE)
+        
+        # convert weakness data to numeric
+        # remove non-numeric text
+        pWeakValues <- as.numeric(
+                str_replace(
+                        subset(pDataWeak, pDataWeak[] != ""), 
+                        "\\*", 
+                        ""
+                )
+        )
+        
+        # all Pokemon have complete weakness values across the same variables
+        pWeakTable <- transpose(data.table(pWeakValues))
+        
+        # get the data from the stats info table
+        pDataStats <- subset(nodes, subset = grepl("Stats", nodes)) 
+        
+        # convert stats data to numeric
+        # extract individual numbers from character string min-max ranges
+        pStatsValues <- 
+                as.numeric(
+                        str_extract_all(
+                                html_text(pDataStats), 
+                                "\\d+", 
+                                simplify = TRUE
+                        )
+                )
+        
+        # all Pokemon have complete stats values across the same variables
+        # certain level values (50, 100) are skipped, since they are labels
+        pStatsTable <- 
+                data.table(
+                        pStatsValues[1],
+                        transpose(data.table(pStatsValues[2:7])), 
+                        transpose(data.table(pStatsValues[9:20])), 
+                        transpose(data.table(pStatsValues[22:33])), 
+                        transpose(data.table(pStatsValues[35:46])), 
+                        transpose(data.table(pStatsValues[48:59])), 
+                        transpose(data.table(pStatsValues[61:72])), 
+                        transpose(data.table(pStatsValues[74:85])) 
+                )
+        
+        # combine the data into a table
+        # represents a single row in the dataset
+        pData <- data.table(
+                fGetDataCommon(nodes), 
+                pHeight, 
+                pWeight, 
+                pVariant, 
+                pType1, 
+                pType2, 
+                pWeakTable, 
+                pStatsTable 
+        )
+        
+        # return
+        return(pData)
+}
+
+# custom function: extract all relevant data that varies when variants are included
+fGetDataVariant <- function(nodes) {
+        
+        # get the data from the common info table
+        pDataCommon <- 
+                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'fooinfo']") %>% 
+                html_text(trim = TRUE)
+        
+        # height (in meters) converted into a numeric value
+        # located in row 6
+        # look for 1 or more digits, then "m"
+        # a decimal point is optional, followed by 0 or more digits
+        # non-numeric text is removed
+        pHeights <- 
+                as.numeric(
+                        str_replace_all(
+                                unlist(
+                                        str_extract_all(
+                                                pDataCommon[6], 
+                                                "(\\d+\\.?\\d*)m"
+                                        )    
+                                ), 
+                                c("m" = "")
+                        )
+                )
+        
+        # weight (in kg) converted into a numeric value
+        # located in row 7
+        # look for 1 or more digits, then "kg"
+        # a decimal point is optional, followed by 0 or more digits
+        # non-numeric text is removed
+        pWeights <- 
+                as.numeric(
+                        str_replace_all(
+                                unlist(
+                                        str_extract_all(
+                                                pDataCommon[7], 
+                                                "(\\d+\\.?\\d*)kg"
+                                        )    
+                                ), 
+                                c("kg" = "")
+                        )
+                )
+        
+        # get the data from the weakness info table
+        # one weakness multiplier for each type
+        # same format for all Pokemon
+        pDataWeak <- 
+                subset(nodes, subset = grepl("Weakness", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'footype']") %>% 
+                html_text(trim = TRUE)
+        
+        # convert weakness data to numeric
+        # remove non-numeric text
+        pWeakValues <- as.numeric(
+                str_replace(
+                        subset(pDataWeak, pDataWeak[] != ""), 
+                        "\\*", 
+                        ""
+                )
+        )
+        
+        # get the stats data tables for all variants
+        pDataStats <- subset(nodes, subset = grepl("Stats", nodes)) 
+        
+        # get the variant info
+        # look for an interior table within the common info table ("cen" class)
+        # multiple variant names and types, if any, are stored in rows (tr)
+        pDataVariants <- 
+                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                html_nodes(xpath = ".//*[@class = 'cen']/table/tr")
+        
+        # create empty table to store variant data
+        # copy the columns from the primary dataset
+        pData <- copy(data[0])
+        
+        # iterate through variant type rows
+        for (i in 1:length(pDataVariants)) {
+                
+                # handle multiple heights and weights
+                # if there are multiple heights
+                if (length(pHeights) > 1) {
+                        
+                        # the first variant
+                        if (i == 1) {
+                                
+                                # the first variant always uses the first value
+                                pHeight <- pHeights[1]
+                        }
+                        
+                        # all other variants
+                        else {
+                                
+                                # all other variants use the second value
+                                pHeight <- pHeights[2]
+                        }
+                }
+                
+                # otherwise
+                else {
+                        
+                        # take the only value
+                        pHeight <- pHeights
+                }
+                
+                # if there are multiple weights
+                if (length(pWeights) > 1) {
+                        
+                        # the first variant
+                        if (i == 1) {
+                                
+                                # the first variant always uses the first value
+                                pWeight <- pWeights[1]
+                        }
+                        
+                        # all other variants
+                        else {
+                                
+                                # all other variants use the second value
+                                pWeight <- pWeights[2]
+                        }
+                }
+                
+                # otherwise
+                else {
+                        
+                        # take the only value
+                        pWeight <- pWeights
+                }
+                
+                # extract the variant name from html text
+                pVariant <- 
+                        pDataVariants[i] %>% 
+                        html_text(trim = TRUE)
+                
+                # extract the variant type(s) from img alt tags
+                # remove unnecessary text from tags (-type)
+                pTypes <- 
+                        str_extract(
+                                pDataVariants[i] %>% 
+                                        html_nodes(xpath = ".//*/img") %>% 
+                                        html_attr("alt"), 
+                                "(.*)(?=(-type))"
+                        )
+                
+                # assign the first type
+                pType1 <- pTypes[1]
+                
+                # assign the second type, if any
+                pType2 <- if (length(pTypes) > 1) pTypes[2] else "None"
+                
+                # all variants have complete weakness values across the same variables
+                # select corresponding weakness values for this iteration
+                pWeakTable <- transpose(data.table(pWeakValues[(1 + ((i - 1) * 18)):(18 + ((i - 1) * 18))]))
+                
+                # extract all stat values from the html text
+                # the first variant
+                if (i == 1) {
+                        
+                        # the first variant always uses the first stats table
+                        pStatsValues <- 
+                                as.numeric(
+                                        str_extract_all(
+                                                html_text(pDataStats[1]), 
+                                                "\\d+", 
+                                                simplify = TRUE
+                                        )
+                                )
+                }
+                
+                # all other variants
+                else {
+                        
+                        # all other variants use the second stats table
+                        pStatsValues <- 
+                                as.numeric(
+                                        str_extract_all(
+                                                html_text(pDataStats[2]), 
+                                                "\\d+", 
+                                                simplify = TRUE
+                                        )
+                                )
+                }
+                
+                # all variants have complete stats values across the same variables
+                # certain level values (50, 100) are skipped, since they are labels and not stats
+                pStatsTable <- 
+                        data.table(
+                                pStatsValues[1],
+                                transpose(data.table(pStatsValues[2:7])), 
+                                transpose(data.table(pStatsValues[9:20])), 
+                                transpose(data.table(pStatsValues[22:33])), 
+                                transpose(data.table(pStatsValues[35:46])), 
+                                transpose(data.table(pStatsValues[48:59])), 
+                                transpose(data.table(pStatsValues[61:72])), 
+                                transpose(data.table(pStatsValues[74:85])) 
+                        )
+                
+                # combine the data into a table
+                # represents one row in variant dataset
+                pRow <- data.table(
+                        fGetDataCommon(nodes), 
+                        pHeight, 
+                        pWeight, 
+                        pVariant, 
+                        pType1, 
+                        pType2, 
+                        pWeakTable, 
+                        pStatsTable 
+                )
+                
+                # add the row to the variant dataset
+                pData <- rbind(pData, pRow, use.names = FALSE)
+        }
+        
+        # return
+        return(pData)
+}
+
+# custom function: fix the data for Rotom, which are coded inconsistently in the original HTML page
+fFixRotom <- function(data) {
+        
+        # problem: in the original page, these inconsistencies appear
+        # variant order in the type table: Normal, Frost, Heat, Mow, Fan, Wash
+        # variant order in the weakness tables: Normal, Heat, Wash, Frost, Fan, Mow
+        # fix: change the variant names to match their corresponding weaknesses
+        
+        # store the variant names in the desired order
+        variantNames <- c("Normal", "Heat", "Wash", "Frost", "Fan", "Mow")
+        
+        # update the variant names
+        data[Name == "Rotom"]$Variant <- variantNames
+        
+}
+
+```
+
+## Procedure
+
+With all of the necessary functions defined, the entire process of collecting, cleaning, and writing the compiled dataset to a csv file can be completed. 
+
+```{r Procedure}
+
+# collect the data
+fDataCollect("GalarPages")
+
+# scrape the data and convert it into a cleaned dataset
+data <- fScrape("GalarPages")
+
+# write the cleaned dataset to a csv file
+fwrite(data, "GalarPokedex.csv")
+
+```
+
+## Data Dictionary
+
+The final dataset contains 429 rows, each representing a single Pokémon, and 110 columns, each representing a characteristic of a Pokémon. The columns contain the following information.
+
+* **NumGal** (numeric): ID number in the Galar Pokédex
+* **NumNat** (numeric): ID number in the National Pokédex
+* **Name** (character): Name of the Pokémon
+* **CanDynamax** (logical): Whether the Pokémon can Dynamax
+* **CaptureRate** (numeric): Capture rate of the Pokémon
+* **BaseEggSteps** (numeric): Base number of steps required to hatch the Pokémon's eggs
+* **PctM / PctF** (numeric): Percentage (Pct) of males (M) and females (F) in the species. If the Pokémon is genderless, a value of 0 is given for both males and females.
+* **Height** (numeric): Height of the Pokémon, in meters (m)
+* **Weight** (numeric): Weight of the Pokémon, in kilograms (kg)
+* **Variant** (character): Name of the Pokémon variant, if any. If not a variant, a value of "Normal" is given. Since some characteristics of variants differ from their non-variants, each variant is placed on its own row in the dataset. 
+* **Type1 / Type2** (character): Primary type (Type1) and secondary type (Type2), if any, of the Pokémon. If no secondary type exists, a value of "None" is given for Type2.
+* **WkNorm:WkFairy** (numeric): Weakness multipliers (damage taken by the Pokémon when attacked by a move of a given type) for all types (Normal, Fire, Water, Electric, Grass, Ice, Fighting, Poison, Ground, Flying, Psychic, Bug, Rock, Ghost, Dragon, Dark, Steel, Fairy)
+* **BaseTotal** (numeric): Sum of the Pokémon's base stats (hit points, attack, defense, special attack, special defense, speed)
+* **BaseHp:BaseSpd** (numeric): Base stats (hit points = Hp, attack = Atk, defense = Def, special attack = SpAtk, special defense = SpDef, speed = Spd) of the Pokémon
+* **HinHpMin50:HinSpdMax50** (numeric): Mimimum (Min) or maximum (Max) value for the given stat (Hp, Atk, Def, SpAtk, SpDef, Spd) at level 50 with a hindering nature (Hin)
+* **HinHpMin100:HinSpdMax100** (numeric): Mimimum (Min) or maximum (Max) value for the given stat (Hp, Atk, Def, SpAtk, SpDef, Spd) at level 100 with a hindering nature (Hin)
+* **NeuHpMin50:NeuSpdMax50** (numeric): Mimimum (Min) or maximum (Max) value for the given stat (Hp, Atk, Def, SpAtk, SpDef, Spd) at level 50 with a neutral nature (Neu)
+* **NeuHpMin100:NeuSpdMax100** (numeric): Mimimum (Min) or maximum (Max) value for the given stat (Hp, Atk, Def, SpAtk, SpDef, Spd) at level 100 with a neutral nature (Neu)
+* **BenHpMin50:BenSpdMax50** (numeric): Mimimum (Min) or maximum (Max) value for the given stat (Hp, Atk, Def, SpAtk, SpDef, Spd) at level 50 with a beneficial nature (Ben)
+* **BenHpMin100:BenSpdMax100** (numeric): Mimimum (Min) or maximum (Max) value for the given stat (Hp, Atk, Def, SpAtk, SpDef, Spd) at level 100 with a beneficial nature (Ben)
+
+## License
+
+You are welcome to use the dataset produced by this analysis: 
+
+* For free 
+* For commercial or noncommercial purposes 
+* Without asking for permission 
+* Without providing credit to the author
+
+If you choose to credit the author, you may do so by: 
+
+* Placing a simple acknowledgement in your work, such as the author's name and a link back to the original analysis 
+* Crediting the author in your reference list or bibliography
+
+Note that providing credit does not imply that the author approves of how the dataset was used or endorses anything related to its use. 
+
+You are welcome to notify the author if you use this work for articles, reports, presentations, websites, or other purposes. 
+
+## Document Info
+
+Data Extraction of Galar Pokédex from Serebii.net 
+
+John M. Quick 
+
+http://johnmquick.com 
+
+Copyright John M. Quick. All Rights Reserved.
