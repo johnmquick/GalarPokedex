@@ -13,6 +13,7 @@ Raw data for over 400 Pokémon were extracted from the Galar Pokédex presented 
 
 # Repository Contents
 
+* DATADICTIONARY.md: Data dictionary for the cleaned dataset
 * GalarPages: Directory that contains the source files as they existed on January 31, 2020
 * GalarPokedex.csv: Cleaned dataset produced by the analysis
 * GalarPokedex.html: Page explaining the entire analysis in detail
@@ -20,4 +21,3 @@ Raw data for over 400 Pokémon were extracted from the Galar Pokédex presented 
 * GalarPokedex.Rmd: R markdown file used to produce GalarPokedex.html
 * GalarPokedex.Rproj: RStudio project used to conduct the analysis
 * LICENSE.md: Licensing information for the cleaned dataset
-* DATADICTIONARY.md: Data dictionary for the cleaned dataset
