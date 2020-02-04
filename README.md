@@ -1,5 +1,5 @@
 # GalarPokedex
-Data Extraction of Galar Pokedex from Serebii.net 
+Data Extraction of Galar Pokédex from Serebii.net 
 
 John M. Quick 
 
