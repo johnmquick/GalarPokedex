@@ -7,7 +7,7 @@ http://johnmquick.com
 
 
 # Abstract
-Raw data for over 400 Pokémon were extracted from the Galar Pokédex presented on the website serebii.net on January 31, 2020. The raw data were cleaned and organized into a tidy dataset. The cleaned dataset contains 429 rows representing the 400 Pokémon in the Galar Pokédex (including variants) and 110 columns representing the characteristics of each Pokémon. 
+Raw data for over 400 Pokémon were extracted from the Galar Pokédex presented on the website serebii.net on January 31, 2020. The raw data were cleaned and organized into a tidy dataset. The cleaned dataset contains over 400 rows representing the Pokémon in the Galar Pokédex, including variants, and 110 columns representing the characteristics of each Pokémon. 
 
 **For details on the analysis and the cleaned dataset, it is recommended that you review [GalarPokedex.html](https://johnmquick.github.io/GalarPokedex/GalarPokedex.html).**
 

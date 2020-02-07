@@ -17,9 +17,6 @@ library(rvest)
 library(stringr)
 library(data.table)
 
-# store date
-runDate <- date()
-
 ####################
 # DATA COLLECTION
 ####################
@@ -217,87 +214,99 @@ data <- data.table(
 # custom function: extract all relevant data from multiple files in a directory and build a clean dataset
 fScrape <- function(dir) {
         
-        # retrieve all files from subdirectory
-        files <- list.files(dir)
+        # retrieve variant and non-variant files
+        filesByType <- fCheckVariants(dir)
         
-        # iterate through all files
-        for (i in 1:length(files)) {
+        # store variant and non-variant files separately for processing
+        # create file path that includes subdirectory for each item
+        filesNormal <- unlist(filesByType[1])
+        filesVariant <- unlist(filesByType[2])
+        
+        # iterate through all normal files
+        for (i in 1:length(filesNormal)) {
+
+                # the normal function returns complete data for one non-variant
+                # this represents one row in the dataset
+                fileData <- fGetDataNormal(filesNormal[i])
                 
-                # create a file path that includes the subdirectory
-                file <- str_glue(dir, "/", files[i])
+                # add the data to the primary dataset
+                data <- rbind(data, fileData, use.names = FALSE)
+        }
+        
+        # iterate through all variant files
+        for (j in 1:length(filesVariant)) {
+
+                # the variant function returns complete data for variants
+                # this represents multiple rows in the dataset
+                fileData <- fGetDataVariant(filesVariant[j])
                 
-                # get the data from the file
-                fileData <- fGetData(file)
-                
-                # add the data (one or more rows) to the primary dataset
+                # add the data to the primary dataset
                 data <- rbind(data, fileData, use.names = FALSE)
         }
         
         # fix inconsistent data
-        fFixRotom(data)
+        data <- fFixRotom(data)
         
         # return
         return(data)
 }
 
-# custom function: check whether variants exist
-fCheckVariants <- function(nodes) {
+# custom function: separate directory files into variants and non-variants
+fCheckVariants <- function(dir) {
         
-        # most Pokemon do not have variants
-        # default to no variants
-        hasVariants <- FALSE
+        # retrieve all files from subdirectory
+        # add subdirectory to create file paths
+        files <- paste0(dir, "/", list.files(dir))
         
-        # check whether variants exist
-        # look for an interior table within the common info table ("cen" class)
-        # multiple variant names and types, if any, are stored in rows (tr)
-        numVariants <- 
-                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
-                html_nodes(xpath = ".//*[@class = 'cen']/table/tr") %>% 
-                length()
+        # store normal and variant files separately for processing
+        filesNormal <- character()
+        filesVariant <- character()
         
-        # no variants
-        if (numVariants > 0) {
-                
-                # toggle flag
-                hasVariants <- TRUE
-        }
-        
-        # return
-        return(hasVariants)
-}
+        # iterate through all files
+        for (i in 1:length(files)) {
 
-# custom function: extract all relevant data for Pokemon, regardless of variants
-fGetData <- function(file) {
-        
-        # retrieve all relevant page data from the "dextable" class
-        pRaw <- read_html(file) %>% html_nodes(xpath = ".//*[@class = 'dextable']")
-        # check for variants
-        # if variants
-        if (fCheckVariants(pRaw)) {
+                # retrieve all relevant page data from the "dextable" class
+                pRaw <- read_html(files[i]) %>% html_nodes(xpath = ".//*[@class = 'dextable']")
+
+                # check whether variants exist
+                # look for multiple stats tables
+                numVariants <- 
+                        subset(pRaw, subset = grepl("Stats", pRaw)) %>% 
+                        length()
                 
-                # the variants function returns complete data for all variants
-                # each variant is a row in the dataset
-                pData <- fGetDataVariant(pRaw)
+                # if there are more than 1 stats tables
+                if (numVariants > 1) {
+                        
+                        # there are variants
+                        # add to variant collection
+                        filesVariant <- append(filesVariant, files[i])
+                }
+                
+                # if there is only 1 stats table
+                else {
+                        
+                        # there are no variants
+                        # add to normal collection
+                        filesNormal <- append(filesNormal, files[i])
+                }
         }
         
-        # if no variants
-        else {
-                
-                # the normal function returns complete data for one non-variant
-                # this represents one row in the dataset
-                pData <- fGetDataNormal(pRaw)
-        }
-        
-        # return the data
-        return(pData)
+        # create a list to store files by type
+        filesByType <- list(filesNormal, filesVariant)
+
+        # return
+        return(filesByType)
 }
 
 # custom function: extract all relevant data that is in common, regardless of variants
-fGetDataCommon <- function(nodes) {
+fGetDataCommon <- function(file) {
+        
+        # retrieve all relevant page data from the "dextable" class
+        pRaw <- read_html(file) %>% html_nodes(xpath = ".//*[@class = 'dextable']")
         
         # get the data from the common info table
         pDataCommon <- 
-                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                subset(pRaw, subset = grepl("Other Names", pRaw)) %>% 
                 html_nodes(xpath = ".//*[@class = 'fooinfo']") %>% 
                 html_text(trim = TRUE)
         
@@ -333,7 +342,7 @@ fGetDataCommon <- function(nodes) {
         
         # get the data from the experience growth table
         pDataExp <- 
-                subset(nodes, subset = grepl("Experience Growth", nodes)) %>% 
+                subset(pRaw, subset = grepl("Experience Growth", pRaw)) %>% 
                 html_nodes(xpath = ".//*[@class = 'fooinfo']") %>% 
                 html_text(trim = TRUE)
         
@@ -358,11 +367,14 @@ fGetDataCommon <- function(nodes) {
 }
 
 # custom function: extract all relevant data for normal (non-variant) Pokemon
-fGetDataNormal <- function(nodes) {
+fGetDataNormal <- function(file) {
+        
+        # retrieve all relevant page data from the "dextable" class
+        pRaw <- read_html(file) %>% html_nodes(xpath = ".//*[@class = 'dextable']")
         
         # get the data from the common info table
         pDataCommon <- 
-                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                subset(pRaw, subset = grepl("Other Names", pRaw)) %>% 
                 html_nodes(xpath = ".//*[@class = 'fooinfo']") %>% 
                 html_text(trim = TRUE)
         
@@ -410,7 +422,7 @@ fGetDataNormal <- function(nodes) {
         # type identifiers are found in the img alt tag(s)
         # remove unnecessary text from the img alt tags (-type)
         pDataTypes <- 
-                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                subset(pRaw, subset = grepl("Other Names", pRaw)) %>% 
                 html_nodes(xpath = ".//*[@class = 'cen']/a/img") %>% 
                 html_attr("alt") %>% 
                 str_extract("(.*)(?=(-type))")
@@ -425,7 +437,7 @@ fGetDataNormal <- function(nodes) {
         # one weakness multiplier for each type
         # same format for all Pokemon
         pDataWeak <- 
-                subset(nodes, subset = grepl("Weakness", nodes)) %>% 
+                subset(pRaw, subset = grepl("Weakness", pRaw)) %>% 
                 html_nodes(xpath = ".//*[@class = 'footype']") %>% 
                 html_text(trim = TRUE)
         
@@ -443,7 +455,7 @@ fGetDataNormal <- function(nodes) {
         pWeakTable <- transpose(data.table(pWeakValues))
         
         # get the data from the stats info table
-        pDataStats <- subset(nodes, subset = grepl("Stats", nodes)) 
+        pDataStats <- subset(pRaw, subset = grepl("Stats", pRaw)) 
         
         # convert stats data to numeric
         # extract individual numbers from character string min-max ranges
@@ -473,7 +485,7 @@ fGetDataNormal <- function(nodes) {
         # combine the data into a table
         # represents a single row in the dataset
         pData <- data.table(
-                fGetDataCommon(nodes), 
+                fGetDataCommon(file), 
                 pHeight, 
                 pWeight, 
                 pVariant, 
@@ -488,11 +500,14 @@ fGetDataNormal <- function(nodes) {
 }
 
 # custom function: extract all relevant data that varies when variants are included
-fGetDataVariant <- function(nodes) {
+fGetDataVariant <- function(file) {
+        
+        # retrieve all relevant page data from the "dextable" class
+        pRaw <- read_html(file) %>% html_nodes(xpath = ".//*[@class = 'dextable']")
         
         # get the data from the common info table
         pDataCommon <- 
-                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+                subset(pRaw, subset = grepl("Other Names", pRaw)) %>% 
                 html_nodes(xpath = ".//*[@class = 'fooinfo']") %>% 
                 html_text(trim = TRUE)
         
@@ -536,7 +551,7 @@ fGetDataVariant <- function(nodes) {
         # one weakness multiplier for each type
         # same format for all Pokemon
         pDataWeak <- 
-                subset(nodes, subset = grepl("Weakness", nodes)) %>% 
+                subset(pRaw, subset = grepl("Weakness", pRaw)) %>% 
                 html_nodes(xpath = ".//*[@class = 'footype']") %>% 
                 html_text(trim = TRUE)
         
@@ -551,21 +566,22 @@ fGetDataVariant <- function(nodes) {
         )
         
         # get the stats data tables for all variants
-        pDataStats <- subset(nodes, subset = grepl("Stats", nodes)) 
+        pDataStats <- subset(pRaw, subset = grepl("Stats", pRaw)) 
         
-        # get the variant info
+        # get the type data for all variants
         # look for an interior table within the common info table ("cen" class)
         # multiple variant names and types, if any, are stored in rows (tr)
-        pDataVariants <- 
-                subset(nodes, subset = grepl("Other Names", nodes)) %>% 
+        pDataTypes <-
+                subset(pRaw, subset = grepl("Other Names", pRaw)) %>%
                 html_nodes(xpath = ".//*[@class = 'cen']/table/tr")
         
         # create empty table to store variant data
         # copy the columns from the primary dataset
         pData <- copy(data[0])
         
-        # iterate through variant type rows
-        for (i in 1:length(pDataVariants)) {
+        # iterate through variants
+        # take the max of either the number of stats tables or weakness value sets
+        for (i in 1:max(length(pDataStats), length(pWeakValues) / 18)) {
                 
                 # handle multiple heights and weights
                 # if there are multiple heights
@@ -618,47 +634,88 @@ fGetDataVariant <- function(nodes) {
                         pWeight <- pWeights
                 }
                 
-                # extract the variant name from html text
-                pVariant <- 
-                        pDataVariants[i] %>% 
-                        html_text(trim = TRUE)
+                # if mutliple types were found
+                if (length(pDataTypes) > 0) {
+                        
+                        # extract the variant type(s) from img alt tags
+                        # remove unnecessary text from tags (-type)
+                        pTypes <- 
+                                str_extract(
+                                        pDataTypes[i] %>% 
+                                                html_nodes(xpath = ".//*/img") %>% 
+                                                html_attr("alt"), 
+                                        "(.*)(?=(-type))"
+                                )
+                        
+                        # assign the first type
+                        pType1 <- pTypes[1]
+                        
+                        # assign the second type, if any
+                        pType2 <- if (length(pTypes) > 1) pTypes[2] else "None"
+                }
                 
-                # extract the variant type(s) from img alt tags
-                # remove unnecessary text from tags (-type)
-                pTypes <- 
-                        str_extract(
-                                pDataVariants[i] %>% 
-                                        html_nodes(xpath = ".//*/img") %>% 
-                                        html_attr("alt"), 
-                                "(.*)(?=(-type))"
-                        )
-                
-                # assign the first type
-                pType1 <- pTypes[1]
-                
-                # assign the second type, if any
-                pType2 <- if (length(pTypes) > 1) pTypes[2] else "None"
+                # otherwise, variants share the same type(s)
+                else {
+                        
+                        # use the normal procedure to extract the type
+                        pTypes <- 
+                                subset(pRaw, subset = grepl("Other Names", pRaw)) %>% 
+                                html_nodes(xpath = ".//*[@class = 'cen']/a/img") %>% 
+                                html_attr("alt") %>% 
+                                str_extract("(.*)(?=(-type))")
+                        
+                        # assign the first type
+                        pType1 <- pTypes[1]
+                        
+                        # assign the second type, if any
+                        pType2 <- if (length(pTypes) > 1) pTypes[2] else "None"
+                        
+                }
                 
                 # all variants have complete weakness values across the same variables
                 # select corresponding weakness values for this iteration
                 pWeakTable <- transpose(data.table(pWeakValues[(1 + ((i - 1) * 18)):(18 + ((i - 1) * 18))]))
                 
-                # extract all stat values from the html text
-                # the first variant
-                if (i == 1) {
+                # some variants share weakness values with the other versions
+                # if previous calculation resulted in NA values
+                if (is.na(pWeakTable[1, 1])) {
                         
-                        # the first variant always uses the first stats table
+                        # just take the regular weakness values
+                        pWeakTable <- transpose(data.table(pWeakValues))
+                        
+                }
+                
+                # extract all stat values from the html text
+                # if a stats table matches the current variant
+                if (length(pDataStats) >= i) {
+                        
+                        # use the corresponding stats table
                         pStatsValues <- 
                                 as.numeric(
                                         str_extract_all(
-                                                html_text(pDataStats[1]), 
+                                                html_text(pDataStats[i]), 
                                                 "\\d+", 
                                                 simplify = TRUE
                                         )
                                 )
+                        
+                        # get the variant name from the stats table
+                        pVariant <- 
+                                str_replace(
+                                        str_replace(
+                                                str_extract(
+                                                        html_text(pDataStats[i]), 
+                                                        "^(Stats - )(.*)Â"
+                                                ), 
+                                                "Stats - ", 
+                                                ""
+                                        ), 
+                                        "Â", 
+                                        ""
+                                )
                 }
-                
-                # all other variants
+
+                # all other variants (sometimes they share stats tables)
                 else {
                         
                         # all other variants use the second stats table
@@ -670,6 +727,28 @@ fGetDataVariant <- function(nodes) {
                                                 simplify = TRUE
                                         )
                                 )
+                        
+                        # get the variant name from the stats table
+                        pVariant <- 
+                                str_replace(
+                                        str_replace(
+                                                str_extract(
+                                                        html_text(pDataStats[2]), 
+                                                        "^(Stats - )(.*)Â"
+                                                ), 
+                                                "Stats - ", 
+                                                ""
+                                        ), 
+                                        "Â", 
+                                        ""
+                                )
+                }
+                
+                # if the variant name is still NA
+                if (is.na(pVariant)) {
+                        
+                        # it is the normal variant
+                        pVariant <- "Normal"
                 }
                 
                 # all variants have complete stats values across the same variables
@@ -689,7 +768,7 @@ fGetDataVariant <- function(nodes) {
                 # combine the data into a table
                 # represents one row in variant dataset
                 pRow <- data.table(
-                        fGetDataCommon(nodes), 
+                        fGetDataCommon(file), 
                         pHeight, 
                         pWeight, 
                         pVariant, 
@@ -707,20 +786,27 @@ fGetDataVariant <- function(nodes) {
         return(pData)
 }
 
-# custom function: fix the data for Rotom, which are coded inconsistently in the original HTML page
+# custom function: fix the Rotom data, which are coded inconsistently in the original HTML page
 fFixRotom <- function(data) {
         
+        # Rotom breaks the mold!
         # problem: in the original page, these inconsistencies appear
         # variant order in the type table: Normal, Frost, Heat, Mow, Fan, Wash
         # variant order in the weakness tables: Normal, Heat, Wash, Frost, Fan, Mow
         # fix: change the variant names to match their corresponding weaknesses
         
-        # store the variant names in the desired order
+        # store the variant names in the proper order
         variantNames <- c("Normal", "Heat", "Wash", "Frost", "Fan", "Mow")
         
-        # update the variant names
-        data[Name == "Rotom"]$Variant <- variantNames
+        # store the variant types in the proper order
+        variantTypes <- c("Ghost", "Fire", "Water", "Ice", "Flying", "Grass")
         
+        # update the variant data
+        data[Name == "Rotom"]$Variant <- variantNames
+        data[Name == "Rotom"]$Type2 <- variantTypes
+        
+        # return
+        return(data)
 }
 
 ####################
@@ -737,5 +823,5 @@ data <- fScrape("GalarPages")
 fwrite(data, "GalarPokedex.csv")
 
 # The cleaned dataset contains:
-# 429 rows representing individual Pokemon
+# 400+ rows representing individual Pokemon
 # 110 columns representing different Pokemon attributes

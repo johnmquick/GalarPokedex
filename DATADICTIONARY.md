@@ -1,4 +1,4 @@
-The final dataset contains 429 rows, each representing a single Pokémon, and 110 columns, each representing a characteristic of a Pokémon. The columns contain the following information.
+The final dataset contains over 400 rows, each representing a single Pokémon, and 110 columns, each representing a characteristic of a Pokémon. The columns contain the following information.
 
 * NumGal (numeric): ID number in the Galar Pokédex
 * NumNat (numeric): ID number in the National Pokédex
